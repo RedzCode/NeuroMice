@@ -26,14 +26,14 @@ maze = [
     [1, 1, 0, 1, 1],
 ]
 
-
-won = False
 running = True
+score = 0
+turn = 0
+lives = 3
 
 # Set up the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("T-Maze")
-
 
 
 def draw_maze():
@@ -77,6 +77,13 @@ def HasWon():
     if maze[player.y][player.x] == 2:
         won = True
         running = False
+        
+def DisplayState(score, lives, turn):
+    print("===========")
+    print("vous avez ",lives, " vies")
+    print("votre score est de ",score)
+    print("new turn ",turn)
+
 
 player = Player()
 while running:
@@ -96,8 +103,22 @@ while running:
 
     #HasWon()
     if maze[player.y][player.x] == 2:
-        won = True
-        running = False
+        if(score == 0):
+            if player.x == 0 :
+                turn = 0
+            elif player.x == GRID_WIDTH-1:
+                turn = 1
+        if(turn%2 == 0 and player.x == 0) or (turn%2 == 1 and player.x == GRID_WIDTH-1) :
+            score += 1
+        else :
+            lives -= 1
+        if(lives == 0):
+            running = False
+        else :
+            turn += 1
+            player = Player()
+        DisplayState(score, lives, turn)
+
 
     # Update the display
     pygame.display.flip()
