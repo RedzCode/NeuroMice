@@ -1,7 +1,7 @@
 import sys
 import pygame
 import random
-from utils import Direction
+from Game.utils import Direction
 
 pygame.init()
 font = pygame.font.Font('freesansbold.ttf', 20)
@@ -15,24 +15,21 @@ class Player:
     def __init__(self):
         self.x = 2
         self.y = 3
-    def move(self, dx, dy, maze):
+    def move(self, dx, dy):
         new_x = self.x + dx
         new_y = self.y + dy
-        if 0 <= new_x < maze.GRID_WIDTH and 0 <= new_y < maze.GRID_HEIGHT  and maze[new_y][new_x] != 1:
-            self.x = new_x
-            self.y = new_y
-    def draw(self, screen,maze):
-        pygame.draw.rect(screen, GRAY, (self.x * maze.CELL_SIZE + ( maze.CELL_SIZE / 4), self.y * maze.CELL_SIZE  + (maze.CELL_SIZE  / 4), maze.MOUSE_SIZE, maze.MOUSE_SIZE))
-
+        self.x = new_x
+        self.y = new_y
 
 class MazeGame : 
 
 
     #TODO : change the param for maze and get the width and height
     def __init__(self, width, height):
-        self.CELLSIZE = 60
-        self.GRID_WIDTH = width
-        self.GRID_HEIGHT = height
+        self.CELL_SIZE = 60
+        self.MOUSE_SIZE = 30
+        self.grid_width = width
+        self.grid_height = height
 
         self.maze = [
             [2, 0, 0, 0, 2],
@@ -41,12 +38,15 @@ class MazeGame :
             [1, 1, 0, 1, 1],
         ]
 
-        self.reset()
+        self.reset(width, height)
 
-    def reset(self):
-
+    def reset(self,width, height):
+        self.grid_width = width
+        self.grid_height = height
         #init display
-        self.screen = pygame.display.set_mode([self.GRID_WIDTH, self.GRID_HEIGHT])
+        SCREEN_WIDTH = self.CELL_SIZE * self.grid_width
+        SCREEN_HEIGHT = self.CELL_SIZE * self.grid_height
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("T-Maze")
         
         #init game state
@@ -54,9 +54,12 @@ class MazeGame :
         self.lives = 3
         self.turn = 0
         self.running = True
-        self.game_over = False
         self.player = Player()
         self.max_turn = 50
+        self.end = False
+
+    def get_turn(self):
+        return self.turn
 
     def input(self):
         for event in pygame.event.get():
@@ -75,18 +78,30 @@ class MazeGame :
 
     def set_direction(self, action):
         if action == Direction.RIGHT:
-            self.player.move(0, -1, self)
+            if self.can_move(self.player.x, self.player.y, 0,-1) :
+                self.player.move(0, -1)
         if action == Direction.LEFT:
-            self.player.move(0, 1, self)
+            if self.can_move(self.player.x, self.player.y, 0,1) :
+                self.player.move(0, 1)
         if action  == Direction.UP:
-            self.player.move(-1, 0, self)
+            if self.can_move(self.player.x, self.player.y, -1,0) :
+                self.player.move(-1, 0)
         if action == Direction.DOWN:
-            self.player.move(1, 0, self)
+            if self.can_move(self.player.x, self.player.y, 1,0) :
+               self.player.move(1, 0)
+
+    def can_move(self, x, y, dx, dy):
+        new_x = x + dx
+        new_y = y + dy
+        if 0 <= new_x < self.grid_width and 0 <= new_y < self.grid_height and self.maze[new_y][new_x] != 1:
+            return True
+        return False
+    
 
     def draw_maze(self):
-        for row in range(self.GRID_HEIGHT):
-            for col in range(self.GRID_WIDTH):
-                rect = pygame.Rect(col * self.CELL_SIZE, row * self.CELL_SIZE, self.CELL_SIZE, self.CELL_SIZE)
+        for row in range(self.grid_height):
+            for col in range(self.grid_width):
+                rect = pygame.Rect(col * self.CELL_SIZE, row *  self.CELL_SIZE,  self.CELL_SIZE,  self.CELL_SIZE)
                 if self.maze[row][col] == 1:
                     pygame.draw.rect(self.screen, BLACK, rect)  # Draw wall
                 elif self.maze[row][col] == 0:
@@ -112,21 +127,22 @@ class MazeGame :
 
         # Draw the maze and the player
         self.draw_maze()
-        self.player.draw(self.screen)
+        #self.player.draw(self.screen)
+        pygame.draw.rect(self.screen, GRAY, (self.player.x * self.CELL_SIZE + ( self.CELL_SIZE / 4), self.player.y * self.CELL_SIZE  + (self.CELL_SIZE  / 4), self.MOUSE_SIZE, self.MOUSE_SIZE))
 
         #HasWon()
         if self.maze[self.player.y][self.player.x] == 2:
             # 1er tour, peu importe quel coté
             if(self.score == 0):
                 if self.player.x == 0 :
-                    turn = 0
-                elif self.player.x == self.GRID_WIDTH-1:
-                    turn = 1
+                    self.turn = 0
+                elif self.player.x == self.grid_width-1:
+                    self.turn = 1
 
             # Si la souris est à droite pendant un tour pair
             # Ou si la souris est à gauche pendant un tour impaire
             # Augmentation du score
-            if(turn%2 == 0 and self.player.x == 0) or (turn%2 == 1 and self.player.x == self.GRID_WIDTH-1) :
+            if(self.turn%2 == 0 and self.player.x == 0) or (self.turn%2 == 1 and self.player.x == self.grid_width-1) :
                 self.score += 1
                 self.reward += 20
             else :
@@ -136,16 +152,21 @@ class MazeGame :
             # Si la souris n'a plus de vie, fin de jeu
             if(self.lives == 0):
                 self.running = False
-                self.game_over = True
+                self.end = True
             else :
-                turn += 1
+                self.turn += 1
                 self.player = Player()
 
             self.display_states()
 
+            if self.max_turn == self.turn:
+                self.running = False
+                self.end = True
+
         # Update the display
         pygame.display.flip()
-        return self.score, self.game_over, self.lives, self.reward, self.turn
+        pygame.time.wait(50)
+        return self.score, self.lives, self.reward, self.turn, self.running, self.end
 
 
        
